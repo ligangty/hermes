@@ -43,6 +43,8 @@ import sys
 import logging
 import re
 
+import cProfile, pstats, io
+
 logger = logging.getLogger(__name__)
 
 
@@ -315,6 +317,8 @@ def handle_maven_uploading(
         # Question: should we exit here?
 
     # 4. Do uploading
+    pr = cProfile.Profile()
+    pr.enable()
     s3_client = S3Client(aws_profile=aws_profile, dry_run=dry_run)
     targets_ = [(bucket[1], remove_prefix(bucket[2], "/")) for bucket in buckets]
     logger.info(
@@ -328,6 +332,9 @@ def handle_maven_uploading(
         root=top_level
     )
     logger.info("Files uploading done\n")
+    pr.disable()
+    __print__profiling(pr)
+    
     succeeded = True
     generated_signs = []
     for bucket in buckets:
@@ -1186,3 +1193,10 @@ class ArchetypeCompareKey(VersionCompareKey):
             return -1
         else:
             return 1
+
+def __print__profiling(pr: cProfile.Profile):
+    s = io.StringIO()
+    sortby = 'cumulative'
+    ps = pstats.Stats(pr, stream=s).sort_stats(sortby)
+    ps.print_stats()
+    logger.info(s.getvalue())
